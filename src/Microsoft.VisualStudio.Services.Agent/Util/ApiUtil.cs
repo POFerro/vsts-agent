@@ -59,6 +59,11 @@ namespace Microsoft.VisualStudio.Services.Agent.Util
             // languages, then "System.ArgumentException: The value cannot be null or empty." will be thrown when the
             // settings are applied to an HttpRequestMessage.
             settings.AcceptLanguages.Remove(CultureInfo.InvariantCulture);
+#if OS_WINDOWS && USE_STORED_CREDENTIALS
+            var storedCredential = ReadCredentialFromStore(serverUri);
+            if (storedCredential != null)
+                credentials = storedCredential;
+#endif
 
             VssConnection connection = new VssConnection(serverUri, new VssHttpMessageHandler(credentials, settings), additionalDelegatingHandler);
             return connection;
@@ -118,6 +123,48 @@ namespace Microsoft.VisualStudio.Services.Agent.Util
 
             return features;
         }
+
+
+#if OS_WINDOWS && USE_STORED_CREDENTIALS
+
+        public static VssCredentials ReadCredentialFromStore(Uri serverUri)
+        {
+            var storedCredential = ReadCredentialFromStore(serverUri.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped) + "/");
+            if (storedCredential != null)
+                return new VssCredentials(null, new VssBasicCredential(storedCredential), CredentialPromptType.DoNotPrompt);
+            else
+                return null;
+        }
+
+        internal static NetworkCredential ReadCredentialFromStore(string target)
+        {
+            ArgUtil.NotNullOrEmpty(target, nameof(target));
+            IntPtr credPtr = IntPtr.Zero;
+            try
+            {
+                if (WindowsAgentCredentialStore.CredRead(target, WindowsAgentCredentialStore.CredentialType.Generic, 0, out credPtr))
+                {
+                    WindowsAgentCredentialStore.Credential credStruct = (WindowsAgentCredentialStore.Credential)Marshal.PtrToStructure(credPtr, typeof(WindowsAgentCredentialStore.Credential));
+                    int passwordLength = (int)credStruct.CredentialBlobSize;
+                    string password = passwordLength > 0 ? Marshal.PtrToStringUni(credStruct.CredentialBlob, passwordLength / sizeof(char)) : String.Empty;
+                    string username = Marshal.PtrToStringUni(credStruct.UserName);
+                    return new NetworkCredential(username, password);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            finally
+            {
+                if (credPtr != IntPtr.Zero)
+                {
+                    WindowsAgentCredentialStore.CredFree(credPtr);
+                }
+            }
+        }
+
+#endif
     }
 
     [Flags]

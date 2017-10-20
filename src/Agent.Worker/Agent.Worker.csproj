@@ -27,10 +27,10 @@
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-    <DefineConstants>$(OSConstant);TRACE;DEBUG;</DefineConstants>
+    <DefineConstants>$(StoredCredentialsConstant);$(OSConstant);TRACE;DEBUG;</DefineConstants>
     <DebugType>portable</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-    <DefineConstants>$(OSConstant);TRACE;</DefineConstants>
+    <DefineConstants>$(StoredCredentialsConstant);$(OSConstant);TRACE;</DefineConstants>
   </PropertyGroup>
 </Project>

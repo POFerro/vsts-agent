@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 {
@@ -123,7 +124,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                     }
                 };
                 string arguments = FormatArguments(formatFlags, args);
-                ExecutionContext.Command($@"tf {arguments}");
+                ExecutionContext.Command($@"tf {ProtectArgumentsSecret(arguments)}");
                 await processInvoker.ExecuteAsync(
                     workingDirectory: SourcesDirectory,
                     fileName: "tf",
@@ -185,7 +186,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                     }
                 };
                 string arguments = FormatArguments(formatFlags, args);
-                ExecutionContext.Debug($@"tf {arguments}");
+                ExecutionContext.Debug($@"tf {ProtectArgumentsSecret(arguments)}");
                 // TODO: Test whether the output encoding needs to be specified on a non-Latin OS.
                 try
                 {
@@ -205,6 +206,11 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 
                 return result;
             }
+        }
+
+        private string ProtectArgumentsSecret(string arguments)
+        {
+            return Regex.Replace(arguments, "(.*/login:[^,]+,?)([^/]*)(.*)", "$1$3");
         }
 
         private string FormatArguments(FormatFlags formatFlags, params string[] args)
@@ -263,14 +269,30 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 
             if (!formatFlags.HasFlag(FormatFlags.OmitLogin))
             {
-                if (Features.HasFlag(TfsVCFeatures.LoginType))
+                bool credentialsFromStore = false;
+#if OS_WINDOWS && USE_STORED_CREDENTIALS
+                var credStore = this.HostContext.GetService<IAgentCredentialStore>();
+                var storedCredentials = credStore.Read(Endpoint.Url.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped) + "/");
+                if (storedCredentials != null)
                 {
-                    formattedArgs.Add($"{Switch}loginType:OAuth");
-                    formattedArgs.Add($"{Switch}login:.,{accessToken}");
+                    var login = string.IsNullOrEmpty(storedCredentials.Domain) ? storedCredentials.UserName : $"{storedCredentials.Domain}\\{storedCredentials.UserName}";
+                    ExecutionContext.Output($@"running tf using store credentials: {login}");
+
+                    formattedArgs.Add($"{Switch}login:{login},{storedCredentials.Password}");
+                    credentialsFromStore = true;
                 }
-                else
+#endif
+                if (!credentialsFromStore)
                 {
-                    formattedArgs.Add($"{Switch}jwt:{accessToken}");
+                    if (Features.HasFlag(TfsVCFeatures.LoginType))
+                    {
+                        formattedArgs.Add($"{Switch}loginType:OAuth");
+                        formattedArgs.Add($"{Switch}login:.,{accessToken}");
+                    }
+                    else
+                    {
+                        formattedArgs.Add($"{Switch}jwt:{accessToken}");
+                    }
                 }
             }
 

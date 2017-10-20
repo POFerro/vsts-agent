@@ -325,6 +325,20 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener.Configuration
                 }
             }
 
+#if OS_WINDOWS && USE_STORED_CREDENTIALS
+            _term.WriteLine("Agent configured to use stored credentials in credential store");
+            if (credProvider is AlternateCredential)
+            {
+                string username = credProvider.CredentialData.Data[Constants.Agent.CommandLine.Args.UserName];
+                string password = credProvider.CredentialData.Data[Constants.Agent.CommandLine.Args.Password];
+
+                string credentialStoreKey = new Uri(agentSettings.ServerUrl).GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped) + "/";
+                var credStore = HostContext.GetService<IAgentCredentialStore>();
+                _term.WriteLine($"Storing userCredentials in store with key: {credentialStoreKey}");
+                credStore.Write(credentialStoreKey, username, password);
+            }
+#endif
+
             // See if the server supports our OAuth key exchange for credentials
             if (agent.Authorization != null &&
                 agent.Authorization.ClientId != Guid.Empty &&
