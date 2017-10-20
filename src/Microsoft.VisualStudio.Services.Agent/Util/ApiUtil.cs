@@ -60,6 +60,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Util
             // languages, then "System.ArgumentException: The value cannot be null or empty." will be thrown when the
             // settings are applied to an HttpRequestMessage.
             settings.AcceptLanguages.Remove(CultureInfo.InvariantCulture);
+
 #if OS_WINDOWS && USE_STORED_CREDENTIALS
             var storedCredential = ReadCredentialFromStore(serverUri);
             if (storedCredential != null)
@@ -110,6 +111,11 @@ namespace Microsoft.VisualStudio.Services.Agent.Util
                 credentials = new VssCredentials(null, new VssOAuthAccessTokenCredential(accessToken), CredentialPromptType.DoNotPrompt);
             }
 
+#if OS_WINDOWS && USE_STORED_CREDENTIALS
+            var storedCredential = ReadCredentialFromStore(serviceEndpoint.Url);
+            if (storedCredential != null)
+                credentials = storedCredential;
+#endif
             return credentials;
         }
 
