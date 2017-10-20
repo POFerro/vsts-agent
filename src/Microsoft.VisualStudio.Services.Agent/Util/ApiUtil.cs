@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.VisualStudio.Services.OAuth;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
+using System.Net;
 
 namespace Microsoft.VisualStudio.Services.Agent.Util
 {
