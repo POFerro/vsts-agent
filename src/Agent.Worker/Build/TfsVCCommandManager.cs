@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 {
@@ -124,7 +123,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                     }
                 };
                 string arguments = FormatArguments(formatFlags, args);
-                ExecutionContext.Command($@"tf {ProtectArgumentsSecret(arguments)}");
+                ExecutionContext.Command($@"tf {arguments}");
                 await processInvoker.ExecuteAsync(
                     workingDirectory: SourcesDirectory,
                     fileName: "tf",
@@ -186,7 +185,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                     }
                 };
                 string arguments = FormatArguments(formatFlags, args);
-                ExecutionContext.Debug($@"tf {ProtectArgumentsSecret(arguments)}");
+                ExecutionContext.Debug($@"tf {arguments}");
                 // TODO: Test whether the output encoding needs to be specified on a non-Latin OS.
                 try
                 {
@@ -206,11 +205,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
 
                 return result;
             }
-        }
-
-        private string ProtectArgumentsSecret(string arguments)
-        {
-            return Regex.Replace(arguments, "(.*/login:[^,]+,?)([^/]*)(.*)", "$1$3");
         }
 
         private string FormatArguments(FormatFlags formatFlags, params string[] args)
@@ -275,6 +269,9 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
                 var storedCredentials = credStore.Read(Endpoint.Url.GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped) + "/");
                 if (storedCredentials != null)
                 {
+                    var _secretMasker = this.HostContext.GetService<ISecretMasker>();
+                    _secretMasker.AddValue(storedCredentials.Password);
+
                     var login = string.IsNullOrEmpty(storedCredentials.Domain) ? storedCredentials.UserName : $"{storedCredentials.Domain}\\{storedCredentials.UserName}";
                     ExecutionContext.Output($@"running tf using store credentials: {login}");
 
